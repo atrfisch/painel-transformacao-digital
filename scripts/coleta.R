@@ -454,15 +454,16 @@ for (a in ANOS_OK) {
     # meses sem Portal: diferença entre retratos acumulados do SIOP
     if (nrow(r)) for (m in setdiff(r$mes, meses_p)) {
       ant_e <- sum(e[seq_len(m - 1)], na.rm = TRUE); ant_l <- sum(l[seq_len(m - 1)], na.rm = TRUE); ant_g <- sum(g[seq_len(m - 1)], na.rm = TRUE)
-      if (m == 1 || all(!is.na(e[seq_len(m - 1)]))) {
-        e[m] <- r[mes == m]$emp - ant_e; l[m] <- r[mes == m]$liq - ant_l; g[m] <- r[mes == m]$pago - ant_g
-      }
+      # se houver meses sem dado antes de m, a diferença inclui também esses meses
+      e[m] <- r[mes == m]$emp - ant_e; l[m] <- r[mes == m]$liq - ant_l; g[m] <- r[mes == m]$pago - ant_g
     }
-    # exercício corrente: mês em curso = SIOP de hoje - acumulado dos meses fechados
-    if (a == ANO_CORRENTE && MES_CORRENTE >= 1 && (MES_CORRENTE == 1 || all(!is.na(e[seq_len(MES_CORRENTE - 1)])))) {
+    # exercício corrente: o último ponto é sempre o SIOP de hoje. O valor do mês
+    # corrente = SIOP - soma dos meses conhecidos; se faltar algum mês do Portal
+    # (o arquivo mensal sai com atraso), a diferença cobre também esses meses.
+    if (a == ANO_CORRENTE && MES_CORRENTE >= 1) {
       b <- ba[[kk]]
       prev <- seq_len(MES_CORRENTE - 1)
-      e[MES_CORRENTE] <- b$emp - sum(e[prev]); l[MES_CORRENTE] <- b$liq - sum(l[prev]); g[MES_CORRENTE] <- b$pago - sum(g[prev])
+      e[MES_CORRENTE] <- b$emp - sum(e[prev], na.rm = TRUE); l[MES_CORRENTE] <- b$liq - sum(l[prev], na.rm = TRUE); g[MES_CORRENTE] <- b$pago - sum(g[prev], na.rm = TRUE)
       dt[MES_CORRENTE] <- b$atual
     }
     if (all(is.na(e)) && all(is.na(dt))) next
@@ -474,7 +475,10 @@ fonte_mes <- lapply(ANOS_OK, function(a) {
   f[meses_portal[ano == a]$mes] <- "portal"
   rm <- setdiff(unique(retratos[ano == a]$mes), meses_portal[ano == a]$mes)
   f[rm] <- "siop"
-  if (a == ANO_CORRENTE) f[MES_CORRENTE] <- "parcial"
+  if (a == ANO_CORRENTE) {
+    f[MES_CORRENTE] <- "parcial"
+    f[seq_len(MES_CORRENTE - 1)][is.na(f[seq_len(MES_CORRENTE - 1)])] <- "lacuna"
+  }
   list(ano = a, fonte = I(f))
 })
 

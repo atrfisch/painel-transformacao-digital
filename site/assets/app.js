@@ -7,8 +7,7 @@
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   const COR = { emp: '#1351B4', liq: '#0F9D8A', pago: '#E8590C', dot: '#C5D4EB', dotLinha: '#5C6E8A', ant: '#8C8C8C', grade: '#EDEDED', texto: '#555555' };
   const POR_PAGINA = 50;
-  const LIMIAR = 1e6; // R$ 1 milhão para pontos de atenção
-
+  
   const S = { ano: null, prog: 'TODOS', orgao: '', busca: '', aba: 'geral', progSel: null,
               ordPos: { col: 'atual', dir: -1 }, pagPos: 0, abertos: new Set() };
   const I = {}; let D = null; const graficos = {};
@@ -41,6 +40,8 @@
 
   // ----------------------------------------------------------------- dados
   function indexar() {
+    const comPO = new Set(D.vinculos.map((v) => v.p));
+    D.programas = D.programas.filter((p) => comPO.has(p.id));
     I.linha = new Map(); D.linhas.forEach((l) => I.linha.set(`${l.a}|${l.k}`, l));
     I.mensal = new Map(); D.mensal.forEach((m) => I.mensal.set(`${m.a}|${m.k}`, m));
     I.prog = new Map(D.programas.map((p) => [p.id, p]));
@@ -100,7 +101,7 @@
   function serieAgregada(ano, itens) {
     const fonte = I.fonteMes.get(ano) || Array(12).fill(null);
     const out = { e: Array(12).fill(null), l: Array(12).fill(null), p: Array(12).fill(null), d: Array(12).fill(null) };
-    for (let m = 0; m < 12; m++) if (fonte[m]) { out.e[m] = 0; out.l[m] = 0; out.p[m] = 0; }
+    for (let m = 0; m < 12; m++) if (TEM_DADO.has(fonte[m])) { out.e[m] = 0; out.l[m] = 0; out.p[m] = 0; }
     const temD = Array(12).fill(false);
     itens.forEach((it) => {
       const s = serieItem(ano, it); if (!s) return;
@@ -111,6 +112,17 @@
     });
     return out;
   }
+  const TEM_DADO = new Set(['portal', 'siop', 'parcial']);
+  // meses sem arquivo do Portal antes do mês corrente: o valor do SIOP de hoje cobre esse intervalo
+  function lacunas(ano) { const f = I.fonteMes.get(ano) || []; return f.map((x, i) => (x === 'lacuna' ? i : -1)).filter((i) => i >= 0); }
+  function rotulosMeses(ano) {
+    const f = I.fonteMes.get(ano) || [], lac = lacunas(ano);
+    return MESES.map((m, i) => {
+      if (f[i] !== 'parcial') return m;
+      return lac.length ? `${MESES[lac[0]]}–${m}*` : `${m}*`;
+    });
+  }
+  const tracejaLacuna = { borderDash: (ctx) => ((ctx.p0.skip || ctx.p1.skip) ? [5, 5] : undefined) };
   const acumular = (arr) => { let s = 0; return arr.map((x) => (x == null ? null : (s += x))); };
   function mesRef(ano) { return ano === D.meta.ano_corrente ? D.meta.mes_corrente : 12; }
   function fracMes(ano) { return ano === D.meta.ano_corrente ? I.dia / I.diasMes : 1; }
@@ -150,8 +162,8 @@
     const M = mesRef(ano);
     const corta = (arr) => arr.map((x, i) => (i < M ? x : null));
     const ds = [
-      { label: `Empenhado ${ano}`, data: corta(acumular(s.e)), borderColor: COR.emp, backgroundColor: COR.emp, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, tension: .15, spanGaps: false },
-      { label: `Pago ${ano}`, data: corta(acumular(s.p)), borderColor: COR.pago, backgroundColor: COR.pago, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, tension: .15 },
+      { label: `Empenhado ${ano}`, data: corta(acumular(s.e)), borderColor: COR.emp, backgroundColor: COR.emp, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, tension: .15, spanGaps: true, segment: tracejaLacuna },
+      { label: `Pago ${ano}`, data: corta(acumular(s.p)), borderColor: COR.pago, backgroundColor: COR.pago, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, tension: .15, spanGaps: true, segment: tracejaLacuna },
     ];
     if (sa && sa.e.some((x) => x != null)) ds.push({ label: `Empenhado ${ano - 1}`, data: acumular(sa.e), borderColor: COR.ant, backgroundColor: COR.ant, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .15 });
     ds.push({ label: 'Dotação atual', data: Array(12).fill(tot[V.ATUAL]), borderColor: COR.dotLinha, backgroundColor: COR.dotLinha, borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0 });
@@ -162,7 +174,7 @@
   function graficoMensal(id, ano, itens) {
     const s = serieAgregada(ano, itens);
     const fonte = I.fonteMes.get(ano) || [];
-    const lab = MESES.map((m, i) => (fonte[i] === 'parcial' ? `${m}*` : m));
+    const lab = rotulosMeses(ano);
     const ds = [
       { label: 'Empenhado no mês', data: s.e, backgroundColor: COR.emp, borderRadius: 3, borderSkipped: 'start', barPercentage: .9, categoryPercentage: .78 },
       { label: 'Liquidado no mês', data: s.l, backgroundColor: COR.liq, borderRadius: 3, borderSkipped: 'start', barPercentage: .9, categoryPercentage: .78 },
@@ -179,7 +191,11 @@
     const partes = [];
     if (p) partes.push(`${p} mês(es) pelo arquivo mensal do Portal da Transparência`);
     if (s) partes.push(`${s} mês(es) pela diferença entre retratos do SIOP`);
-    if (f.includes('parcial')) partes.push(`* mês corrente parcial: SIOP de ${dataBR(D.meta.data_referencia)} menos o acumulado dos meses anteriores`);
+    const lac = lacunas(ano);
+    if (f.includes('parcial')) {
+      const ini = lac.length ? MESES[lac[0]] : MESES[f.indexOf('parcial')];
+      partes.push(`* ${lac.length ? `${ini} a ${MESES[f.indexOf('parcial')]}` : 'mês corrente'}: SIOP de ${dataBR(D.meta.data_referencia)} menos o acumulado dos meses anteriores${lac.length ? ' (o arquivo mensal do Portal ainda não saiu para esses meses; no gráfico acumulado, o trecho tracejado liga o último mês do Portal ao SIOP de hoje)' : ''}`);
+    }
     if (!partes.length) return 'Ainda não há série mensal para este exercício.';
     return `Série mensal: ${partes.join('; ')}.`;
   }
@@ -269,67 +285,6 @@
     return linhas;
   }
 
-  // ------------------------------------------------------ pontos de atenção
-  function pontosAtencao(ano) {
-    const itens = selecao(ano, S.prog);
-    const corrente = ano === D.meta.ano_corrente, M = mesRef(ano);
-    const out = [];
-    // ritmo médio do ano anterior (para POs novos)
-    const ant = I.vincAno.has(ano - 1) ? selecao(ano - 1, S.prog) : null;
-    let ritmoGeral = null;
-    if (ant && corrente) {
-      const sa = serieAgregada(ano - 1, ant), ta = soma(ant);
-      const ac = acumMesmoPeriodo(sa.e, ano);
-      ritmoGeral = ac != null ? razao(ac, ta[V.ATUAL]) : null;
-    }
-    for (const it of itens) {
-      const v = it.v, l = it.linha;
-      const nome = `${l.acd} › ${l.pod}`;
-      const base = { k: it.k, nome, uo: l.uod, progs: it.progs };
-      if (corrente && v[V.ATUAL] >= LIMIAR) {
-        const pe = razao(v[V.EMP], v[V.ATUAL]);
-        let ritmo = null, refTxt = '';
-        const la = I.linha.get(`${ano - 1}|${it.k}`);
-        if (la && la.v[V.ATUAL] > 0) {
-          const ma = I.mensal.get(`${ano - 1}|${it.k}`);
-          const ac = ma ? acumMesmoPeriodo(ma.e, ano) : null;
-          if (ac != null) { ritmo = ac / la.v[V.ATUAL]; refTxt = `em ${ano - 1}, na mesma data, o PO tinha empenhado ${pct(ritmo)}`; }
-        }
-        if (ritmo == null && ritmoGeral != null) { ritmo = ritmoGeral; refTxt = `o conjunto selecionado tinha ${pct(ritmo)} em ${ano - 1}`; }
-        if (v[V.EMP] <= 0 && M >= 4) out.push({ ...base, tipo: 'sem-empenho', sev: 'alta', titulo: 'Sem empenho no exercício', texto: `Dotação atual de ${rs(v[V.ATUAL])} sem nenhum valor empenhado.`, valor: v[V.ATUAL] });
-        else if (ritmo != null && pe != null && pe < ritmo - 0.25) out.push({ ...base, tipo: 'ritmo', sev: 'alta', titulo: 'Execução abaixo do ritmo do ano anterior', texto: `Empenhado ${pct(pe)} da dotação; ${refTxt}.`, valor: v[V.ATUAL] - v[V.EMP] });
-        if (v[V.EMP] >= 5 * LIMIAR && M >= 9 && razao(v[V.PAGO], v[V.EMP]) < 0.3) out.push({ ...base, tipo: 'pagamento', sev: 'media', titulo: 'Pagamento baixo em relação ao empenhado', texto: `Pago ${pct(razao(v[V.PAGO], v[V.EMP]))} do empenhado (${rs(v[V.EMP] - v[V.PAGO])} a pagar).`, valor: v[V.EMP] - v[V.PAGO] });
-      }
-      if (v[V.LOA] >= LIMIAR && v[V.ATUAL] <= 0.8 * v[V.LOA]) out.push({ ...base, tipo: 'corte', sev: 'media', titulo: 'Dotação reduzida em relação à LOA', texto: `Dotação atual de ${rs(v[V.ATUAL])}, ${pct(1 - v[V.ATUAL] / v[V.LOA])} abaixo da LOA (${rs(v[V.LOA])}).`, valor: v[V.LOA] - v[V.ATUAL] });
-      if (v[V.ATUAL] >= LIMIAR && v[V.ATUAL] >= 1.2 * Math.max(v[V.LOA], 1)) out.push({ ...base, tipo: 'reforco', sev: 'info', titulo: 'Dotação reforçada por créditos', texto: `Dotação atual de ${rs(v[V.ATUAL])}, ${v[V.LOA] > 0 ? `${pct(v[V.ATUAL] / v[V.LOA] - 1)} acima da LOA` : 'sem valor na LOA'}.`, valor: v[V.ATUAL] - v[V.LOA] });
-      const la = I.linha.get(`${ano - 1}|${it.k}`);
-      const va = la ? ((I.vincChave.get(`${ano - 1}|${it.k}`) || []).reduce((m, x) => Math.max(m, x.v[V.ATUAL]), 0)) : 0;
-      if (va >= LIMIAR && v[V.ATUAL] <= 0.7 * va) out.push({ ...base, tipo: 'queda', sev: 'media', titulo: `Queda da dotação em relação a ${ano - 1}`, texto: `De ${rs(va)} em ${ano - 1} para ${rs(v[V.ATUAL])} (${delta(v[V.ATUAL], va)}).`, valor: va - v[V.ATUAL] });
-    }
-    // POs que existiam no ano anterior e sumiram
-    if (ant) {
-      const agora = new Set(itens.map((x) => x.k));
-      ant.forEach((it) => { if (!agora.has(it.k) && it.v[V.ATUAL] >= LIMIAR) out.push({ k: it.k, nome: `${it.linha.acd} › ${it.linha.pod}`, uo: it.linha.uod, progs: it.progs, tipo: 'sumiu', sev: 'media', titulo: `PO de ${ano - 1} sem dotação em ${ano}`, texto: `Tinha ${rs(it.v[V.ATUAL])} em ${ano - 1} e não aparece em ${ano} com o recorte atual.`, valor: it.v[V.ATUAL] }); });
-    }
-    // programas sem PO identificado
-    if (S.prog === 'TODOS' && !S.orgao && !S.busca) D.programas.forEach((p) => {
-      if (!selecao(ano, p.id).length) out.push({ k: null, nome: p.nome, uo: p.orgao, progs: [p.id], tipo: 'programa', sev: 'info', titulo: 'Programa sem plano orçamentário identificado', texto: p.nota || 'Nenhuma regra encontrou linhas no SIOP. Vincule os POs em config/vinculos_manuais.csv.', valor: 0 });
-    });
-    const pesoSev = { alta: 0, media: 1, info: 2 };
-    out.sort((a, b) => pesoSev[a.sev] - pesoSev[b.sev] || b.valor - a.valor);
-    return out;
-  }
-  function htmlAtencao(lst) {
-    if (!lst.length) return '<p class="vazio">Nenhum ponto de atenção para o recorte selecionado.</p>';
-    const ic = { alta: '!', media: '!', info: 'i' };
-    return `<div class="lista-atencao">${lst.map((a) => `<div class="item-atencao sev-${a.sev}">
-      <span class="icone" aria-hidden="true">${ic[a.sev]}</span>
-      <div><div class="titulo">${esc(a.titulo)}</div><div class="texto"><strong>${esc(a.nome)}</strong> · ${esc(a.uo || '')}${a.k ? ` · <span class="cod">${esc(a.k)}</span>` : ''}</div><div class="texto">${a.texto}</div>
-      <div>${(a.progs || []).map((p) => `<span class="chip">${esc((I.prog.get(p) || {}).curto || p)}</span>`).join('')}</div></div>
-      <div class="valor">${a.valor ? rs(a.valor) : ''}</div></div>`).join('')}</div>`;
-  }
-  const CRITERIOS = `Critérios (linhas com dotação a partir de R$ 1 milhão): <strong>sem empenho</strong> a partir de abril; <strong>abaixo do ritmo</strong> quando o percentual empenhado está 25 pontos ou mais abaixo do que o mesmo PO tinha empenhado na mesma data do ano anterior; <strong>pagamento baixo</strong> quando, a partir de setembro, menos de 30% do empenhado foi pago; <strong>dotação reduzida</strong> quando a dotação atual está 20% ou mais abaixo da LOA; <strong>queda</strong> quando a dotação caiu 30% ou mais em relação ao ano anterior. O valor à direita é o montante em jogo (saldo, corte ou diferença).`;
-
   // --------------------------------------------------------------- abas
   function renderGeral() {
     const ano = S.ano;
@@ -340,8 +295,6 @@
     graficoAcumulado('g-acum', ano, itens, itensAnt);
     graficoMensal('g-mensal', ano, itens);
     $('nota-mensal').textContent = notaFonte(ano);
-    const at = pontosAtencao(ano);
-    $('atencao-resumo').innerHTML = htmlAtencao(at.slice(0, 6)) + (at.length > 6 ? `<p class="nota">Mais ${at.length - 6} ponto(s) na aba Pontos de atenção.</p>` : '');
     tabelaProgramas(ano);
   }
   function escopoTxt() {
@@ -455,9 +408,9 @@
     if (!s) { const c = $(id); if (c) c.parentElement.innerHTML = '<p class="vazio">Sem série mensal para este PO.</p>'; return; }
     const M = mesRef(ano);
     const ac = (arr) => acumular(arr).map((x, i) => (i < M ? x : null));
-    desenhar(id, { type: 'bar', data: { labels: MESES, datasets: [
-      { type: 'line', label: 'Empenhado acumulado', data: ac(s.e), borderColor: COR.emp, backgroundColor: COR.emp, borderWidth: 2, pointRadius: 2, tension: .15 },
-      { type: 'line', label: 'Pago acumulado', data: ac(s.p), borderColor: COR.pago, backgroundColor: COR.pago, borderWidth: 2, pointRadius: 2, tension: .15 },
+    desenhar(id, { type: 'bar', data: { labels: rotulosMeses(ano), datasets: [
+      { type: 'line', label: 'Empenhado acumulado', data: ac(s.e), borderColor: COR.emp, backgroundColor: COR.emp, borderWidth: 2, pointRadius: 2, tension: .15, spanGaps: true, segment: tracejaLacuna },
+      { type: 'line', label: 'Pago acumulado', data: ac(s.p), borderColor: COR.pago, backgroundColor: COR.pago, borderWidth: 2, pointRadius: 2, tension: .15, spanGaps: true, segment: tracejaLacuna },
       { label: 'Empenhado no mês', data: s.e, backgroundColor: 'rgba(19,81,180,.25)', borderRadius: 3, borderSkipped: 'start' },
     ] }, options: { interaction: { mode: 'index', intersect: false }, scales: { y: eixoValor, x: eixoCat }, plugins: { tooltip: dicaValor, legend: { position: 'bottom', labels: { font: { size: 11 } } } } } });
   }
@@ -467,13 +420,6 @@
     const t = soma(itens);
     $('pos-contagem').innerHTML = `<strong>${itens.length}</strong> plano(s) orçamentário(s) · dotação atual ${rs(t[V.ATUAL])} · empenhado ${rs(t[V.EMP])} (${pct(razao(t[V.EMP], t[V.ATUAL]))})`;
     tabelaPOs($('t-pos'), S.ano, itens, $('pos-paginas'));
-  }
-  function renderAtencao() {
-    $('atencao-escopo').textContent = `· ${escopoTxt()}`;
-    $('atencao-criterios').innerHTML = CRITERIOS;
-    const lst = pontosAtencao(S.ano);
-    const grupos = [['sem-empenho', 'Sem empenho'], ['ritmo', 'Abaixo do ritmo do ano anterior'], ['pagamento', 'Pagamento baixo'], ['corte', 'Dotação reduzida em relação à LOA'], ['queda', 'Queda em relação ao ano anterior'], ['sumiu', 'POs que deixaram de ter dotação'], ['reforco', 'Dotações reforçadas'], ['programa', 'Programas sem PO identificado']];
-    $('atencao-lista').innerHTML = grupos.map(([t, nome]) => { const g = lst.filter((a) => a.tipo === t); return g.length ? `<div class="grupo-atencao"><h3>${nome} (${g.length})</h3>${htmlAtencao(g)}</div>` : ''; }).join('') || '<p class="vazio">Nenhum ponto de atenção para o recorte selecionado.</p>';
   }
   function renderRevisar() {
     const repo = repoGitHub();
@@ -509,7 +455,7 @@
       <h3>De onde vêm os dados</h3>
       <ul>
         <li><strong>Dotação e execução anual</strong> (PLOA, LOA, dotação atual, empenhado, liquidado e pago): SIOP, pelo endpoint SPARQL consultado com a função <code>despesaDetalhada()</code> do pacote R <code>orcamentoBR</code>${m.versao_orcamentoBR ? ` (versão ${esc(m.versao_orcamentoBR)})` : ''}, detalhado por órgão, UO, programa, ação e plano orçamentário. Orçamentos Fiscal e da Seguridade Social.</li>
-        <li><strong>Série mês a mês</strong>: o SIOP/orcamentoBR não tem dimensão mensal. Para os meses fechados, o painel usa o arquivo mensal <em>Execução da despesa</em> do Portal da Transparência, que vem da mesma base (SIAFI) e traz o código do PO. O mês corrente é estimado pelo valor do SIOP no dia menos o acumulado dos meses fechados. Sem o arquivo do Portal, a série é montada a partir dos retratos do SIOP que o painel guarda a cada atualização.</li>
+        <li><strong>Série mês a mês</strong>: o SIOP/orcamentoBR não tem dimensão mensal. Para os meses fechados, o painel usa o arquivo mensal <em>Execução da despesa</em> do Portal da Transparência, que vem da mesma base (SIAFI) e traz o código do PO. O último ponto da série é sempre o SIOP do dia: o mês corrente (e os meses que ainda não têm arquivo do Portal) recebe a diferença entre o SIOP e o acumulado dos meses do Portal. Sem o arquivo do Portal, a série é montada a partir dos retratos do SIOP que o painel guarda a cada atualização.</li>
         <li><strong>Dotação ao longo do ano</strong>: retratos do SIOP guardados em <code>dados/historico/</code>; a série começa a partir da primeira coleta.</li>
         <li><strong>Atualização</strong>: dias úteis, pelo GitHub Actions. Última geração: ${esc(m.gerado_em)}.</li>
       </ul>
@@ -529,7 +475,8 @@
       <h3>Limitações</h3>
       <ul>
         <li>Recursos fora do OGU (crédito do BNDES, Orçamento de Investimento das estatais como Serpro, Dataprev e Finep) não aparecem no SIOP/orcamentoBR.</li>
-        <li>Programas sem PO próprio (INSPIRE, Serviço na Ponta, CIT Digital, IDEIA Terra) dependem de vínculo manual.</li>
+        <li>Programas sem nenhum plano orçamentário identificado não aparecem no painel. Para incluir um, cadastre-o em <code>config/programas.csv</code> e vincule os POs em <code>config/vinculos_manuais.csv</code>.</li>
+        <li>O arquivo mensal do Portal da Transparência sai com alguns meses de atraso. Nos meses ainda sem arquivo, a execução aparece agregada no mês corrente, pela diferença entre o SIOP do dia e o último mês do Portal.</li>
         <li>Na regra por fonte (FISTEL), a série mensal é estimada proporcionalmente, porque o arquivo do Portal não traz a fonte.</li>
       </ul>
       <h3>Conciliação Portal × SIOP (empenhado de todo o orçamento)</h3>
@@ -559,7 +506,7 @@
     salvarHash();
   }
   function render() {
-    ({ geral: renderGeral, programas: renderProgramas, pos: renderPOs, atencao: renderAtencao, revisar: renderRevisar, metodo: renderMetodo }[S.aba] || renderGeral)();
+    ({ geral: renderGeral, programas: renderProgramas, pos: renderPOs, revisar: renderRevisar, metodo: renderMetodo }[S.aba] || renderGeral)();
   }
   function salvarHash() {
     const p = new URLSearchParams({ aba: S.aba, ano: S.ano, prog: S.prog });
@@ -573,7 +520,7 @@
     if (p.get('orgao')) S.orgao = p.get('orgao');
     if (p.get('q')) S.busca = p.get('q');
     if (p.get('sel')) S.progSel = p.get('sel');
-    if (p.get('aba')) S.aba = p.get('aba');
+    if (p.get('aba') && ['geral', 'programas', 'pos', 'revisar', 'metodo'].includes(p.get('aba'))) S.aba = p.get('aba');
   }
   function montarFiltros() {
     const anos = [...D.meta.anos].sort((a, b) => b - a);

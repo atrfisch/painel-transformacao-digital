@@ -2,15 +2,14 @@
 
 Painel estático (GitHub Pages) que acompanha, **no nível de plano orçamentário (PO)**, a dotação e a execução das ações de transformação digital do Governo Federal:
 
-PBIA · INSPIRE · IDEIA Terra · Supercomputadores · FNDCT · FUST · FISTEL · CIN · Serviço na Ponta · CIT Digital · NIB Missão 4 · LLM Nacional · Nuvem de Governo · PNID · Gov.br · Outras ações de TD
+PBIA · Supercomputadores · FNDCT · FUST · FISTEL · CIN · NIB Missão 4 · Nuvem de Governo · PNID · Gov.br · Outras ações de TD
 
 Para cada programa, órgão ou PO o painel mostra:
 
 - PLOA, LOA, dotação atual, empenhado, liquidado e pago;
 - comparação com o exercício anterior (dotação anual e execução até a mesma data);
-- saldo a empenhar, saldo a pagar e projeção de fim de ano pelo calendário do ano anterior;
+- saldo a empenhar, saldo a pagar e projeção de fim de ano pelo calendário do ano anterior.
 - série mês a mês (empenhado, liquidado e pago) e acumulado;
-- pontos de atenção (sem empenho, ritmo abaixo do ano anterior, cortes, quedas, pagamento baixo).
 
 ## Estrutura
 
@@ -55,7 +54,7 @@ Depois disso, o painel se atualiza sozinho nos dias úteis e também sempre que 
 
 ```
 programa_id,chave,operacao,fator,observacao
-INSPIRE,24901.XXXX.YYYY,incluir,1,PO do FNDCT que financia o INSPIRE
+PBIA,24901.XXXX.YYYY,incluir,1,PO do FNDCT ligado ao PBIA
 PBIA,26101.2000.0006,excluir,,não é IA
 NIB_M4,24901.0A29.0000,incluir,0.3,30% da subvenção atribuída à Missão 4
 ```

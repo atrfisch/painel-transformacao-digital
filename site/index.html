@@ -57,7 +57,6 @@
     <button role="tab" data-aba="geral" aria-selected="true">Visão geral</button>
     <button role="tab" data-aba="programas" aria-selected="false">Programas</button>
     <button role="tab" data-aba="pos" aria-selected="false">Planos orçamentários</button>
-    <button role="tab" data-aba="atencao" aria-selected="false">Pontos de atenção</button>
     <button role="tab" data-aba="revisar" aria-selected="false">Linhas a revisar</button>
     <button role="tab" data-aba="metodo" aria-selected="false">Metodologia</button>
   </div>
@@ -83,14 +82,6 @@
         <p id="nota-mensal" class="nota"></p>
       </article>
     </div>
-
-    <article class="cartao">
-      <header class="cartao-cab cab-flex">
-        <div><h3>Pontos de atenção</h3><p>Linhas com execução abaixo do ritmo do ano anterior, sem empenho, com corte ou queda de dotação.</p></div>
-        <button class="btn-link" data-ir="atencao">Ver todos</button>
-      </header>
-      <div id="atencao-resumo"></div>
-    </article>
 
     <article class="cartao">
       <header class="cartao-cab"><h3>Programas</h3><p>Clique em um programa para ver o detalhe. Um mesmo PO pode pertencer a mais de um programa; o total geral não soma duas vezes.</p></header>
@@ -120,13 +111,6 @@
     </div>
     <div class="tabela-rolagem"><table id="t-pos" class="tabela tabela-pos"></table></div>
     <div id="pos-paginas" class="paginacao"></div>
-  </section>
-
-  <!-- ATENÇÃO -->
-  <section id="aba-atencao" class="aba" hidden>
-    <h2 class="titulo-secao">Pontos de atenção <span id="atencao-escopo" class="escopo"></span></h2>
-    <p class="texto-apoio" id="atencao-criterios"></p>
-    <div id="atencao-lista"></div>
   </section>
 
   <!-- REVISAR -->
