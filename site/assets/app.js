@@ -9,7 +9,7 @@
   const POR_PAGINA = 50;
   
   const S = { ano: null, prog: 'TODOS', orgao: '', busca: '', aba: 'geral', progSel: null,
-              ordPos: { col: 'atual', dir: -1 }, pagPos: 0, abertos: new Set() };
+              ordPos: { col: 'atual', dir: -1 }, pagPos: 0, revFiltro: null, abertos: new Set() };
   const I = {}; let D = null; const graficos = {};
 
   // ------------------------------------------------------------- formatação
@@ -424,15 +424,27 @@
   function renderRevisar() {
     const repo = repoGitHub();
     $('revisar-editar').innerHTML = repo ? `<a class="btn-secundario" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noopener" href="https://github.com/${repo}/edit/main/config/vinculos_manuais.csv">Abrir vinculos_manuais.csv no GitHub</a>` : '';
-    const opts = D.programas.map((p) => `<option value="${p.id}">${esc(p.curto)}</option>`).join('');
-    const lst = (D.candidatos || []).map((c) => ({ c, l: I.linha.get(`${c.ano}|${c.k}`) })).filter((x) => x.l && passaFiltro(x.l));
-    $('t-revisar').innerHTML = `<thead><tr><th>Ação › Plano orçamentário</th><th>UO</th><th class="n">Dotação atual (${lst[0] ? lst[0].c.ano : ''})</th><th class="n">Empenhado</th><th>Termo encontrado</th><th>Incluir em</th></tr></thead><tbody>${lst.map(({ c, l }) => `<tr>
+    const todos = (D.candidatos || []).map((c) => ({ c, l: I.linha.get(`${c.ano}|${c.k}`) })).filter((x) => x.l && passaFiltro(x.l));
+    const retiradas = todos.filter((x) => x.c.sug), outras = todos.filter((x) => !x.c.sug);
+    if (!['retiradas', 'termos'].includes(S.revFiltro)) S.revFiltro = retiradas.length ? 'retiradas' : 'termos';
+    $('rev-filtro').innerHTML = `<button class="${S.revFiltro === 'retiradas' ? 'btn-primario' : 'btn-secundario'}" data-rf="retiradas">Retiradas automaticamente (${retiradas.length})</button>
+      <button class="${S.revFiltro === 'termos' ? 'btn-primario' : 'btn-secundario'}" data-rf="termos">Não classificadas com termos de tecnologia (${outras.length})</button>`;
+    $('rev-filtro').querySelectorAll('[data-rf]').forEach((b) => b.addEventListener('click', () => { S.revFiltro = b.dataset.rf; renderRevisar(); }));
+    $('rev-explica').innerHTML = S.revFiltro === 'retiradas'
+      ? 'Planos orçamentários que entrariam num programa pela UO (por exemplo, o FNDCT), mas foram retirados automaticamente porque a ação e o PO não mencionam nenhum termo de transformação digital. Para trazer um de volta, clique em <strong>Copiar linha</strong> e cole em <code>config/vinculos_manuais.csv</code>.'
+      : 'Planos orçamentários que não entraram em nenhum programa, mas mencionam termos de tecnologia ou dados. Escolha o programa, copie a linha e cole em <code>config/vinculos_manuais.csv</code>.';
+    const lst = S.revFiltro === 'retiradas' ? retiradas : outras;
+    const opts = (sug) => D.programas.map((p) => `<option value="${p.id}"${p.id === sug ? ' selected' : ''}>${esc(p.curto)}</option>`).join('');
+    const totAtual = lst.reduce((s, x) => s + (x.l.v[V.ATUAL] || 0), 0);
+    $('t-revisar').innerHTML = `<thead><tr><th>Ação › Plano orçamentário</th><th>UO</th><th class="n">Exercício</th><th class="n">Dotação atual</th><th class="n">Empenhado</th><th>${S.revFiltro === 'retiradas' ? 'Motivo' : 'Termo encontrado'}</th><th>Trazer para</th></tr></thead><tbody>${lst.map(({ c, l }) => `<tr>
       <td class="desc"><strong>${esc(l.acd)}</strong> › ${esc(l.pod)}<div class="cod">${esc(c.k)}</div></td><td>${esc(l.uod)}<div class="cod">${esc(l.ogd)}</div></td>
-      <td class="n">${rs(l.v[V.ATUAL])}</td><td class="n">${rs(l.v[V.EMP])}</td><td><code>${esc(c.termo)}</code></td>
-      <td><select data-k="${esc(c.k)}" aria-label="Programa">${opts}</select> <button class="btn-mini" data-inc="${esc(c.k)}">Copiar linha</button></td></tr>`).join('') || `<tr><td colspan="6" class="vazio">Nenhuma linha a revisar.</td></tr>`}</tbody>`;
+      <td class="n">${c.ano}</td><td class="n">${rs(l.v[V.ATUAL])}</td><td class="n">${rs(l.v[V.EMP])}</td>
+      <td>${c.sug ? esc(c.motivo) : `<code>${esc(c.termo)}</code>`}</td>
+      <td style="white-space:nowrap"><select aria-label="Programa">${opts(c.sug)}</select> <button class="btn-mini" data-inc="${esc(c.k)}">Copiar linha</button></td></tr>`).join('')}
+      ${lst.length ? `<tr class="total"><td colspan="3">${lst.length} linha(s)</td><td class="n">${rs(totAtual)}</td><td colspan="3"></td></tr>` : `<tr><td colspan="7" class="vazio">Nenhuma linha.</td></tr>`}</tbody>`;
     $('t-revisar').querySelectorAll('[data-inc]').forEach((b) => b.addEventListener('click', () => {
       const p = b.parentElement.querySelector('select').value;
-      copiar(`${p},${b.dataset.inc},incluir,1,`);
+      copiar(`${p},${b.dataset.inc},incluir,1,trazida de volta pela aba de revisão`);
     }));
   }
   function repoGitHub() {
@@ -461,6 +473,7 @@
       </ul>
       <h3>Como as linhas entram em cada programa</h3>
       <ul>
+        <li>FNDCT: entram só os POs da UO do fundo cuja ação ou PO menciona algum termo de transformação digital (coluna <code>exige_texto</code> de <code>config/regras.csv</code>). Os demais são retirados automaticamente e ficam listados em Linhas a revisar, de onde podem ser trazidos de volta.</li>
         <li>Regras em <code>config/regras.csv</code>: por UO (fundos como FNDCT e FUST), por código de ação ou PO, por expressão regular sobre a descrição da ação e do PO, ou por fonte de recursos (FISTEL).</li>
         <li>Ajustes manuais em <code>config/vinculos_manuais.csv</code>: incluir ou excluir um PO (chave <code>UO.Ação.PO</code>) de um programa, com fator opcional para atribuir só uma parcela.</li>
         <li>Um PO pode estar em mais de um programa (por exemplo, FNDCT e PBIA). Os totais de cada programa contam o PO inteiro; o total de “Todos os programas” conta cada PO uma vez só.</li>

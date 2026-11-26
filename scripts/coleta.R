@@ -108,6 +108,12 @@ programas[, residual := residual %in% c("1", "sim", "TRUE", "true")]
 if (nrow(regras)) {
   desconhecidos <- setdiff(regras$programa_id, programas$id)
   if (length(desconhecidos)) aviso("regras.csv cita programas inexistentes: %s", paste(desconhecidos, collapse = ", "))
+  if (!"exige_texto" %in% names(regras)) regras[, exige_texto := ""]
+  regras[is.na(exige_texto), exige_texto := ""]
+  for (i in seq_len(nrow(regras))) if (nzchar(regras$exige_texto[i])) {
+    ok <- tryCatch({ grepl(regras$exige_texto[i], "teste", perl = TRUE); TRUE }, error = function(e) FALSE)
+    if (!ok) { aviso("exige_texto inválido em regras.csv (linha %d); filtro ignorado.", i + 1); regras$exige_texto[i] <- "" }
+  }
   for (i in seq_len(nrow(regras))) if (regras$tipo[i] %in% c("texto", "fonte")) {
     ok <- tryCatch({ grepl(regras$valor[i], "teste", perl = TRUE); TRUE }, error = function(e) FALSE)
     if (!ok) { aviso("regex inválida em regras.csv (linha %d): %s", i + 1, regras$valor[i]); regras$tipo[i] <- "invalida" }
@@ -234,10 +240,20 @@ regras_nr  <- regras[programa_id %in% programas[residual == FALSE]$id & tipo != 
 regras_res <- regras[programa_id %in% programas[residual == TRUE]$id & tipo != "fonte"]
 regras_fon <- regras[tipo == "fonte"]
 
+# linhas que casaram com uma regra mas foram barradas pelo filtro exige_texto
+# (ex.: POs do FNDCT sem relação com transformação digital) vão para a aba de revisão
+rejeitados <- data.table()
 aplicar <- function(rr, d) {
   out <- list()
   for (i in seq_len(nrow(rr))) {
     s <- casa(rr[i], d)
+    filtro <- if (!is.null(rr$exige_texto)) rr$exige_texto[i] else ""
+    if (!is.na(filtro) && nzchar(filtro)) {
+      passa <- grepl(filtro, d$txt, perl = TRUE)
+      barr <- s & !passa
+      if (any(barr)) rejeitados <<- rbind(rejeitados, data.table(p = rr$programa_id[i], ano = d$ano[barr], k = d$k[barr]))
+      s <- s & passa
+    }
     if (any(s)) out[[length(out) + 1]] <- data.table(p = rr$programa_id[i], ano = d$ano[s], k = d$k[s],
                                                      origem = sprintf("regra %s: %s", rr$tipo[i], rr$valor[i]))
   }
@@ -303,18 +319,33 @@ for (i in seq_len(nrow(regras_fon))) {
 vinculos <- vinculos[rowSums(abs(as.matrix(vinculos[, ..METRICAS]))) > 0]
 msg("Vínculos: %d (programa x exercício x PO)", nrow(vinculos))
 
-# candidatos: linhas não vinculadas com termos de TD
+# candidatos para a aba "Linhas a revisar":
+#  (a) linhas retiradas automaticamente pelo filtro exige_texto (ex.: FNDCT sem termo de TD);
+#  (b) linhas não classificadas que mencionam termos de tecnologia.
 chaves_vinc <- unique(vinculos$k)
 candidatos <- data.table()
+if (nrow(rejeitados)) {
+  rej <- unique(rejeitados)[ano >= ANO_CORRENTE - 1]
+  rej <- rej[!vinculos[, .(p, k)], on = .(p, k)]          # já trazidas de volta manualmente
+  rej <- merge(rej, base, by = c("ano", "k"))
+  if (nrow(rej)) {
+    rej <- rej[order(-ano, -atual)][, .SD[1], by = .(k, p)]
+    nomes <- setNames(programas$nome_curto, programas$id)
+    rej[, `:=`(termo = "", sug = p, motivo = sprintf("Retirada de %s: sem termo de transformação digital", nomes[p]))]
+    candidatos <- rej[, !"p"]
+  }
+}
 if (length(termos_cand)) {
   rx <- paste(termos_cand, collapse = "|")
-  cand <- base[!k %in% chaves_vinc & grepl(rx, txt, perl = TRUE) & ano >= ANO_CORRENTE - 1]
+  cand <- base[!k %in% chaves_vinc & !k %in% candidatos$k & grepl(rx, txt, perl = TRUE) & ano >= ANO_CORRENTE - 1]
   if (nrow(cand)) {
     cand <- cand[order(-ano, -atual)][, .SD[1], by = k]
     cand[, termo := vapply(txt, function(t) { h <- termos_cand[vapply(termos_cand, function(z) grepl(z, t, perl = TRUE), TRUE)]; paste(head(h, 3), collapse = ", ") }, "")]
-    candidatos <- head(cand[order(-atual)], 600)
+    cand[, `:=`(sug = "", motivo = "Menciona termo de tecnologia")]
+    candidatos <- rbind(candidatos, head(cand[order(-atual)], 600), fill = TRUE)
   }
 }
+if (nrow(rejeitados)) msg("Retiradas pelo filtro exige_texto: %d linhas (exercício corrente e anterior) -> aba de revisão", sum(candidatos$sug != "", na.rm = TRUE))
 
 # ------------------------------------------------------- retratos do SIOP --
 # um arquivo por mês (AAAA-MM.csv), regravado a cada execução daquele mês;
@@ -486,7 +517,7 @@ fonte_mes <- lapply(ANOS_OK, function(a) {
 linhas_ids <- unique(c(vinculos$k, candidatos$k))
 linhas <- base[k %in% linhas_ids]
 setorder(linhas, ano, og, uo, ac, po)
-cand_out <- if (nrow(candidatos)) candidatos[, .(k, ano, termo)] else data.table()
+cand_out <- if (nrow(candidatos)) candidatos[, .(k, ano, termo, sug, motivo)] else data.table()
 
 lista_linhas <- lapply(seq_len(nrow(linhas)), function(i) {
   x <- linhas[i]

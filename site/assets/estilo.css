@@ -202,3 +202,4 @@ tr.detalhe td { background: #FAFBFD; }
   .filtros, .cabecalho-acoes, .paginacao, .btn-mini { display: none !important; }
   .cartao, .kpi { box-shadow: none; border: 1px solid var(--cinza-3); }
 }
+.rev-filtro { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }

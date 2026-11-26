@@ -1,15 +1,15 @@
-programa_id,tipo,valor,escopo,observacao
-PBIA,texto,"inteligencia artificial|\bia\b|aprendizado de maquina|aprendizagem de maquina|machine learning|\bpbia\b",,Regex sobre a descrição da ação e do PO (minúsculas e sem acento)
-SUPERCOMP,texto,"supercomput|alto desempenho|santos dumont|\bhpc\b|processamento de alto",,
-FNDCT,uo,24901,,UO do FNDCT
-FNDCT,uo,74910,,Operações oficiais de crédito sob supervisão do FNDCT (empréstimo à Finep)
-FUST,uo,41902,,UO do FUST
-FISTEL,fonte,"fistel|fiscalizacao das telecomunicacoes",41000,Regex sobre a descrição da fonte; escopo = órgão consultado com o detalhe de fonte
-CIN,texto,"identidade nacional|carteira de identidade|\bcin\b|procin|identificacao civil|identificacao do cidadao",,
-NIB_M4,texto,"industria 4\.?0|manufatura avancada|semicondutor|microeletronic|robotic|nova industria brasil|\bnib\b",,
-NIB_M4,uo,24209,,CEITEC
-NUVEM,texto,"\bnuvem\b|computacao em nuvem|\bcloud\b",,
-PNID,texto,"inclusao digital|conectividade|internet nas escolas|escolas? conectadas?|\bgesac\b|wi-?fi brasil|norte conectado|nordeste conectado|internet brasil|banda larga|\b5g\b|cidades? digita|computadores para inclusao",,
-GOVBR,texto,"gov\.br|governo digital|transformacao digital (do estado|de servicos|da administracao|no setor publico)|servicos? publicos? digita|plataformas? digita(l|is) d[eo] governo|identidade digital|assinatura (eletronica|digital)|certificacao digital|login unico",,
-OUTRAS_TD,texto,"transformacao digital|ciberseguranca|seguranca cibernetica|dados abertos|interoperabilidade|infraestrutura nacional de dados|economia digital|soberania digital|rede nacional de ensino e pesquisa|\brnp\b|tecnologias? digita|digitalizacao|governanca de dados",,Residual
-OUTRAS_TD,uo,41903,,FUNTTEL
+programa_id,tipo,valor,escopo,exige_texto,observacao
+PBIA,texto,inteligencia artificial|\bia\b|aprendizado de maquina|aprendizagem de maquina|machine learning|\bpbia\b,,,Regex sobre a descrição da ação e do PO (minúsculas e sem acento)
+SUPERCOMP,texto,supercomput|alto desempenho|santos dumont|\bhpc\b|processamento de alto,,,
+FNDCT,uo,24901,,digita|inteligencia artificial|\bia\b|aprendizado de maquina|computac|computador|supercomput|alto desempenho|\bhpc\b|tecnologias? da informacao|\btics?\b|software|semicondut|microeletron|chip|ciberne|ciberseg|seguranca da informacao|\bdados\b|telecomunic|conectividade|\b[56]g\b|internet|banda larga|robotic|industria 4|manufatura avancada|quantic|nuvem|plataformas? digita|algoritm|automacao|eletronic|sistemas de informacao|\brnp\b|rede nacional de ensino,UO do FNDCT — só entram POs com termo de TD; os demais vão para Linhas a revisar
+FNDCT,uo,74910,,digita|inteligencia artificial|\bia\b|aprendizado de maquina|computac|computador|supercomput|alto desempenho|\bhpc\b|tecnologias? da informacao|\btics?\b|software|semicondut|microeletron|chip|ciberne|ciberseg|seguranca da informacao|\bdados\b|telecomunic|conectividade|\b[56]g\b|internet|banda larga|robotic|industria 4|manufatura avancada|quantic|nuvem|plataformas? digita|algoritm|automacao|eletronic|sistemas de informacao|\brnp\b|rede nacional de ensino,Operações oficiais de crédito sob supervisão do FNDCT (empréstimo à Finep) — só entram POs com termo de TD; os demais vão para Linhas a revisar
+FUST,uo,41902,,,UO do FUST
+FISTEL,fonte,fistel|fiscalizacao das telecomunicacoes,41000,,Regex sobre a descrição da fonte; escopo = órgão consultado com o detalhe de fonte
+CIN,texto,identidade nacional|carteira de identidade|\bcin\b|procin|identificacao civil|identificacao do cidadao,,,
+NIB_M4,texto,industria 4\.?0|manufatura avancada|semicondutor|microeletronic|robotic|nova industria brasil|\bnib\b,,,
+NIB_M4,uo,24209,,,CEITEC
+NUVEM,texto,\bnuvem\b|computacao em nuvem|\bcloud\b,,,
+PNID,texto,inclusao digital|conectividade|internet nas escolas|escolas? conectadas?|\bgesac\b|wi-?fi brasil|norte conectado|nordeste conectado|internet brasil|banda larga|\b5g\b|cidades? digita|computadores para inclusao,,,
+GOVBR,texto,gov\.br|governo digital|transformacao digital (do estado|de servicos|da administracao|no setor publico)|servicos? publicos? digita|plataformas? digita(l|is) d[eo] governo|identidade digital|assinatura (eletronica|digital)|certificacao digital|login unico,,,
+OUTRAS_TD,texto,transformacao digital|ciberseguranca|seguranca cibernetica|dados abertos|interoperabilidade|infraestrutura nacional de dados|economia digital|soberania digital|rede nacional de ensino e pesquisa|\brnp\b|tecnologias? digita|digitalizacao|governanca de dados,,,Residual
+OUTRAS_TD,uo,41903,,,FUNTTEL
