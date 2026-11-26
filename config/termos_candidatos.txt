@@ -1,0 +1,14 @@
+# Termos que fazem uma linha aparecer na aba "Linhas a revisar" quando ela
+# ainda não foi classificada em nenhum programa. Uma expressão regular por linha,
+# em minúsculas e sem acento. Linhas começando com # são ignoradas.
+tecnologia da informacao
+\btic\b
+\bti\b
+informatica
+software
+sistemas? de informac
+\bdigita
+\bdados\b
+telecomunicac
+inovacao
+plataforma

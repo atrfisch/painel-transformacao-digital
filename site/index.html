@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel da Transformação Digital – Execução Orçamentária</title>
+<meta name="description" content="Execução orçamentária, no nível de plano orçamentário, dos programas de transformação digital do Governo Federal.">
+<link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/estilo.css">
+</head>
+<body>
+<a class="pular" href="#conteudo">Ir para o conteúdo</a>
+
+<header class="cabecalho">
+  <div class="cabecalho-topo container">
+    <div class="cabecalho-acoes">
+      <span id="atualizacao" class="atualizacao">Carregando dados…</span>
+      <a class="btn-link" href="dados/linhas.csv" download>Baixar dados (CSV)</a>
+    </div>
+  </div>
+  <div class="faixa-titulo">
+    <div class="container">
+      <p class="sobretitulo">Monitoramento orçamentário</p>
+      <h1>Painel da Transformação Digital</h1>
+      <p class="subtitulo">Dotação e execução dos programas de transformação digital do Governo Federal, por plano orçamentário, com dados do SIOP e do Portal da Transparência.</p>
+    </div>
+  </div>
+</header>
+
+<div id="faixa-simulado" class="faixa-simulado" hidden>
+  <div class="container"><strong>Dados simulados.</strong> Esta é uma prévia de layout com valores inventados; os dados reais aparecem após a primeira coleta automática.</div>
+</div>
+
+<nav class="filtros" aria-label="Filtros">
+  <div class="container filtros-linha">
+    <label class="campo">
+      <span>Exercício</span>
+      <select id="f-ano"></select>
+    </label>
+    <label class="campo campo-largo">
+      <span>Programa</span>
+      <select id="f-prog"><option value="TODOS">Todos os programas (sem dupla contagem)</option></select>
+    </label>
+    <label class="campo campo-largo">
+      <span>Órgão</span>
+      <select id="f-orgao"><option value="">Todos os órgãos</option></select>
+    </label>
+    <label class="campo campo-busca">
+      <span>Buscar</span>
+      <input id="f-busca" type="search" placeholder="Ação, PO, UO ou código">
+    </label>
+    <button id="f-limpar" class="btn-secundario" type="button">Limpar</button>
+  </div>
+  <div class="container abas" role="tablist">
+    <button role="tab" data-aba="geral" aria-selected="true">Visão geral</button>
+    <button role="tab" data-aba="programas" aria-selected="false">Programas</button>
+    <button role="tab" data-aba="pos" aria-selected="false">Planos orçamentários</button>
+    <button role="tab" data-aba="atencao" aria-selected="false">Pontos de atenção</button>
+    <button role="tab" data-aba="revisar" aria-selected="false">Linhas a revisar</button>
+    <button role="tab" data-aba="metodo" aria-selected="false">Metodologia</button>
+  </div>
+</nav>
+
+<main id="conteudo" class="container">
+  <div id="erro" class="alerta alerta-erro" hidden></div>
+
+  <!-- VISÃO GERAL -->
+  <section id="aba-geral" class="aba" aria-labelledby="t-geral">
+    <h2 id="t-geral" class="titulo-secao">Visão geral <span id="geral-escopo" class="escopo"></span></h2>
+    <div id="kpis" class="kpis"></div>
+    <div id="projecao" class="projecao"></div>
+
+    <div class="grade-2">
+      <article class="cartao">
+        <header class="cartao-cab"><h3>Execução acumulada no ano</h3><p>Empenhado e pago acumulados, comparados ao exercício anterior e à dotação atual.</p></header>
+        <div class="grafico"><canvas id="g-acum" role="img" aria-label="Execução acumulada no ano"></canvas></div>
+      </article>
+      <article class="cartao">
+        <header class="cartao-cab"><h3>Execução mês a mês</h3><p>Valores empenhados, liquidados e pagos em cada mês.</p></header>
+        <div class="grafico"><canvas id="g-mensal" role="img" aria-label="Execução mês a mês"></canvas></div>
+        <p id="nota-mensal" class="nota"></p>
+      </article>
+    </div>
+
+    <article class="cartao">
+      <header class="cartao-cab cab-flex">
+        <div><h3>Pontos de atenção</h3><p>Linhas com execução abaixo do ritmo do ano anterior, sem empenho, com corte ou queda de dotação.</p></div>
+        <button class="btn-link" data-ir="atencao">Ver todos</button>
+      </header>
+      <div id="atencao-resumo"></div>
+    </article>
+
+    <article class="cartao">
+      <header class="cartao-cab"><h3>Programas</h3><p>Clique em um programa para ver o detalhe. Um mesmo PO pode pertencer a mais de um programa; o total geral não soma duas vezes.</p></header>
+      <div class="tabela-rolagem"><table id="t-programas" class="tabela"></table></div>
+    </article>
+
+    <article class="cartao">
+      <header class="cartao-cab"><h3>Percentual executado por programa</h3><p>Empenhado e pago como percentual da dotação atual. Passe o mouse para ver os valores em reais.</p></header>
+      <div class="grafico grafico-alto"><canvas id="g-programas" role="img" aria-label="Percentual executado por programa"></canvas></div>
+    </article>
+  </section>
+
+  <!-- PROGRAMAS -->
+  <section id="aba-programas" class="aba" hidden>
+    <div class="layout-programas">
+      <aside id="lista-programas" class="lista-programas" aria-label="Programas"></aside>
+      <div id="detalhe-programa" class="detalhe-programa"></div>
+    </div>
+  </section>
+
+  <!-- POs -->
+  <section id="aba-pos" class="aba" hidden>
+    <h2 class="titulo-secao">Planos orçamentários <span id="pos-escopo" class="escopo"></span></h2>
+    <div class="barra-tabela">
+      <span id="pos-contagem"></span>
+      <button id="pos-csv" class="btn-secundario" type="button">Exportar seleção (CSV)</button>
+    </div>
+    <div class="tabela-rolagem"><table id="t-pos" class="tabela tabela-pos"></table></div>
+    <div id="pos-paginas" class="paginacao"></div>
+  </section>
+
+  <!-- ATENÇÃO -->
+  <section id="aba-atencao" class="aba" hidden>
+    <h2 class="titulo-secao">Pontos de atenção <span id="atencao-escopo" class="escopo"></span></h2>
+    <p class="texto-apoio" id="atencao-criterios"></p>
+    <div id="atencao-lista"></div>
+  </section>
+
+  <!-- REVISAR -->
+  <section id="aba-revisar" class="aba" hidden>
+    <h2 class="titulo-secao">Linhas a revisar</h2>
+    <p class="texto-apoio">Planos orçamentários que mencionam termos de tecnologia ou dados, mas não entraram em nenhum programa. Para incluir uma linha, escolha o programa, copie a linha gerada e cole no arquivo <code>config/vinculos_manuais.csv</code> do repositório. O mesmo arquivo aceita <code>excluir</code> para retirar um PO classificado por engano.</p>
+    <div id="revisar-editar" class="texto-apoio"></div>
+    <div class="tabela-rolagem"><table id="t-revisar" class="tabela"></table></div>
+  </section>
+
+  <!-- METODOLOGIA -->
+  <section id="aba-metodo" class="aba" hidden>
+    <h2 class="titulo-secao">Metodologia e fontes</h2>
+    <div id="metodo"></div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="container">
+    <p><strong>Casa Civil da Presidência da República</strong></p>
+    <p>Fontes: Sistema Integrado de Planejamento e Orçamento (SIOP), consultado pelo pacote R <a href="https://cran.r-project.org/package=orcamentoBR">orcamentoBR</a>, e arquivos mensais de execução da despesa do <a href="https://portaldatransparencia.gov.br/download-de-dados/despesas-execucao">Portal da Transparência</a>. Valores correntes, em reais.</p>
+  </div>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="assets/vendor/chart.umd.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
