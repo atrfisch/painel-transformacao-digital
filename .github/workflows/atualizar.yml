@@ -1,0 +1,75 @@
+name: Atualizar painel
+
+on:
+  schedule:
+    - cron: "17 10 * * 1-5"   # dias úteis, 7h17 de Brasília
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["config/*", "scripts/", "site/", ".github/workflows/*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: painel-td
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      TZ: America/Sao_Paulo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Instalar pacotes R
+        run: Rscript -e 'install.packages(c("orcamentoBR", "jsonlite", "data.table"))'
+
+      - name: Restaurar cache do SIOP
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: siop-${{ github.run_id }}
+          restore-keys: siop-
+
+      - name: Coletar dados (SIOP + Portal da Transparência)
+        run: Rscript scripts/coleta.R
+
+      - name: Guardar histórico no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados/
+          if git diff --cached --quiet; then
+            echo "Sem mudanças no histórico."
+          else
+            git commit -m "dados: atualização de $(date +%Y-%m-%d)"
+            git pull --rebase --autostash || true
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publicar:
+    needs: coletar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
